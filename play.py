@@ -15,7 +15,7 @@ def play_one_round(players, names, verbose=False):
             show_play(r, play, pad_length)
         r.whose_turn = 1 - r.whose_turn
 
-    return r.get_winner()
+    return r.h[r.get_winner()].name
 
 def show_play(r, play, pad_length):
     card, is_discard, draw = play

@@ -97,7 +97,8 @@ class Round():
         for p in range(N_PLAYERS):
             scores[p] = sum([score_expedition(f.played[p])
                              for f in self.flags.values()])
-            print(f'Player {p} scores {scores[p]}')
+            if self.verbose:
+                print(f'Player {p} scores {scores[p]}')
 
         return scores.index(max(scores))
 
