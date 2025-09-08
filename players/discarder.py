@@ -1,6 +1,6 @@
 """Like Kenny, but discards intelligently when forced to.
 
-Win rate vs. Kenny: 50.65% +/- 0.005% (n = 10^6)
+Win rate vs. Kenny: 50.65% +/- 0.05% (n = 10^6)
 """
 
 from classes import *

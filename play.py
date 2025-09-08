@@ -8,10 +8,11 @@ def play_one_round(players, names, verbose=False):
     r.generate_decks_and_deal_hands()
 
     while r.deck:
-        play = r.execute_play(players[r.whose_turn])
         if verbose:
             hand = r.h[r.whose_turn]
             pad_length = hand.show()
+        play = r.execute_play(players[r.whose_turn])
+        if verbose:
             show_play(r, play, pad_length)
         r.whose_turn = 1 - r.whose_turn
 

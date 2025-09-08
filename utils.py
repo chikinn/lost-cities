@@ -23,3 +23,9 @@ def discard_intelligently(cards, flags, me):
         return safe[0]
     cards.sort(key=lambda x: x[1])
     return cards[0]  # Or just the lowest
+
+def playable_draws(flags, me):
+    return [f.discards[-1] for f in flags.values()
+                            if f.discards
+                           and is_playable(f.discards[-1],
+                                           flags[f.discards[-1][0]].played[me])]
