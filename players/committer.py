@@ -33,7 +33,7 @@ class Committer(Player):
         else:
             discard = discard_intelligently(cards, r.flags, me)
             if draw[0] == discard[0]:  # Don't discard to the pile you'll draw
-                draw = 'deck'          # draw from; instead, draw from the deck.
+                draw = 'deck'          # from; instead, draw from the deck.
             return discard, True, draw
 
 def minimize_gap(cards, flags, me):
