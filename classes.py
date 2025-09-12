@@ -78,6 +78,9 @@ class Round():
 
     def get_winner(self):
         def score_expedition(cards):
+            if not cards:
+                return 0
+
             mult = 1
             sum_ = 0
             for c in cards:
