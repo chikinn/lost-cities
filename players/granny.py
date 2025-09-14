@@ -75,7 +75,7 @@ class Granny(Player):
             if r.flags[c[0]].played[me]:  # Already started this suit
                 if int(c[1]) > highest_candidate:  # Prefer high cards.
                     draw = c
-                    highest_candidate = c[1]
+                    highest_candidate = int(c[1])
 
         if is_discard:
             play = discard
