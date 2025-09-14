@@ -15,6 +15,7 @@ parser.add_argument('declaredPlayers', metavar='player', type=str, nargs=2,
     help=', '.join(availablePlayers.keys()))
 parser.add_argument('-n', '--n_rounds', default=1, metavar='n_rounds',
     type=int, help='positive int')
+parser.add_argument('-s', '--same_starter', action='store_true')
 
 args = parser.parse_args()
 
@@ -55,6 +56,9 @@ winners = []
 for i in range(args.n_rounds):
     if verbose:
         print('\nROUND {}:'.format(i))
+    if not args.same_starter:
+        players.reverse()  # Switch every round so first player alternates.
+        names.reverse()
     winners.append(play_one_round(players, names, verbose))
 #    if not verbose:
 #        print('Winner: {}'.format(winners[-1]))
