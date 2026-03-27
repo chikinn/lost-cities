@@ -74,89 +74,101 @@ class Brob(Player):
 
         playable = [c for c in hand if is_playable(c, flags[c[0]].played[me])]
 
-        draw = 'deck'
+        # Filter: only play into expeditions worth committing to
+        worth_playing = self._filter_worth_playing(playable, flags, hand, me, phase)
 
-        if playable:
-            # --- Core: pick play by gap, with tiebreakers ---
-            card = self._choose_play(playable, flags, hand, me, phase)
-
-            # --- Draw: check if a discard draw improves our hand ---
-            # Compare the second-best play's gap against available discard draws
+        if worth_playing:
+            card = self._choose_play(worth_playing, flags, hand, me, phase)
             draw = self._choose_draw_after_play(card, flags, hand, me, phase)
-
             return card, False, draw
         else:
-            # --- Forced discard ---
             card = self._choose_discard(hand, flags, me)
-
-            # --- Draw: pick best available, avoiding discarded suit ---
             draw = self._choose_draw_after_discard(card, flags, hand, me, phase)
-
             return card, True, draw
 
+    def _filter_worth_playing(self, playable, flags, hand, me, phase):
+        """Filter out plays that would open clearly bad expeditions.
+        Always allow extending existing expeditions. For new ones, apply
+        a light gate: just need *some* support to justify opening."""
+        worth = []
+        for card in playable:
+            suit = card[0]
+            played = flags[suit].played[me]
+
+            # Already started: always worth extending
+            if played:
+                worth.append(card)
+                continue
+
+            # New expedition: need at least some reason to open
+            hand_in_suit = [c for c in hand if c[0] == suit]
+
+            # Opening with a single high card (6+) and nothing else is bad —
+            # it starts an expedition that's hard to fill
+            if len(hand_in_suit) == 1 and card[1] >= '6':
+                continue
+
+            # Late game: don't open unless you have real depth
+            if phase >= 0.6 and len(hand_in_suit) < 3:
+                continue
+
+            worth.append(card)
+
+        return worth
+
     def _choose_play(self, playable, flags, hand, me, phase):
-        """Pick the best card to play using gap minimization + tiebreakers."""
-        scored = minimize_gap_scored(playable, flags, me)
+        """Pick the best card using gap as primary score + strategic bonuses.
+        Gap is weighted heavily but not absolute — depth and bonus proximity
+        can override a 1-gap difference."""
+        scored_gaps = minimize_gap_scored(playable, flags, me)
 
-        if len(scored) == 1:
-            return scored[0][0]
+        best_card = scored_gaps[0][0]
+        best_score = -999
 
-        best_gap = scored[0][1]
-        # Collect all cards tied at the best gap
-        tied = [c for c, g in scored if g == best_gap]
-
-        if len(tied) == 1:
-            return tied[0]
-
-        # Tiebreakers among cards with equal gap:
-        best_card = tied[0]
-        best_tb = -999
-        for card in tied:
-            tb = self._tiebreak_score(card, flags, hand, me, phase)
-            if tb > best_tb:
-                best_tb = tb
+        for card, gap in scored_gaps:
+            score = self._combined_play_score(card, gap, flags, hand, me, phase)
+            if score > best_score:
+                best_score = score
                 best_card = card
 
         return best_card
 
-    def _tiebreak_score(self, card, flags, hand, me, phase):
-        """Score for breaking ties when multiple cards have the same gap."""
+    def _combined_play_score(self, card, gap, flags, hand, me, phase):
+        """Combined score: gap dominates, but strategic factors can tip close calls."""
         suit = card[0]
         played = flags[suit].played[me]
         score = 0.0
 
-        # Prefer extending existing expeditions
+        # Gap is the dominant factor: each gap point costs 10 score.
+        # Strategic bonuses max out around 5-6, so they can only override
+        # a 0-gap vs 1-gap decision at best.
+        score -= gap * 10
+
+        # Extending existing expeditions
         if played:
-            score += 5
+            score += 2
+            score += len(played) * 0.3
 
-        # Prefer suits with contracts (higher multiplier)
+        # Contracts multiplier bonus
         n_contracts = sum(1 for c in played if c[1] == '0')
-        score += n_contracts * 3
+        score += n_contracts * 1.5
 
-        # Prefer suits closer to 8-card bonus
+        # 8-card bonus chase
         needed = cards_to_bonus(suit, flags, me)
         if 0 < needed <= 3:
             hand_in_suit = playable_in_hand(suit, hand, flags, me)
             remaining = remaining_above(suit, flags, hand, me)
             total_available = len(played) + len(hand_in_suit) + len(remaining)
             if total_available >= BONUS_THRESHOLD:
-                score += (4 - needed) * 3
+                score += (4 - needed) * 2
 
-        # Prefer suits with more supporting cards in hand
+        # Hand density: slight preference for suits with more cards in hand
         hand_in_suit = [c for c in hand if c[0] == suit]
-        score += len(hand_in_suit) * 1.5
+        score += len(hand_in_suit) * 0.5
 
-        # Slight preference for higher face value (more points)
+        # Face value (tiny tiebreaker)
         if card[1] != '0':
-            score += (int(card[1]) + 1) * 0.1
-
-        # Early game: prefer contracts with support
-        if card[1] == '0' and not played and phase < 0.3:
-            supporting = len([c for c in hand if c[0] == suit and c[1] != '0'])
-            if supporting >= 2:
-                score += 5
-            else:
-                score -= 3
+            score += (int(card[1]) + 1) * 0.05
 
         return score
 
