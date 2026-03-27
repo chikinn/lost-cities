@@ -190,51 +190,68 @@ def turns_remaining(flags, hand):
 # ---------------------------------------------------------------------------
 
 def card_value_for_me(card, flags, me):
-    """How valuable is this specific card to me?
-    Returns a score based on whether it's playable and how it fits my expeditions."""
+    """How valuable is drawing this specific card?
+
+    Four categories of cards:
+    1. Useful to me          -> positive
+    2. Useful to opponent    -> negative (I'd rather it stay in the deck)
+    3. Useful to both        -> positive (I get it, opponent doesn't)
+    4. Useful to neither     -> zero (just game clock)
+    """
     suit = card[0]
-    played = flags[suit].played[me]
+    my_played = flags[suit].played[me]
+    opp_played = flags[suit].played[1 - me]
 
-    if not is_playable(card, played):
-        return -1.0  # Dead card, will become deadwood
+    playable_for_me = is_playable(card, my_played)
+    playable_for_opp = is_playable(card, opp_played)
 
-    # Base value: face value (shifted)
+    if not playable_for_me and not playable_for_opp:
+        return 0.0  # Category 4: dead card, just game clock
+
+    if not playable_for_me and playable_for_opp:
+        # Category 2: helps opponent only — slightly negative since it clogs
+        # my hand as deadwood. But mild: it's not actively harmful.
+        return -0.2
+
+    # Category 1 or 3: playable for me
     if card[1] == '0':
-        base_value = 0
+        base_value = 2.0
     else:
         base_value = int(card[1]) + 1
 
     # Bonus for being sequential (no gap)
-    if played:
-        highest = int(played[-1][1])
+    if my_played:
+        highest = int(my_played[-1][1])
         card_val = int(card[1])
-        gap = card_val - highest - 1
         if card[1] != '0':
-            gap = max(0, gap)
-        # Sequential play is worth more
-        if gap == 0:
-            base_value += 3
-        elif gap == 1:
-            base_value += 1
+            gap = max(0, card_val - highest - 1)
+            if gap == 0:
+                base_value += 5
+            elif gap == 1:
+                base_value += 2
     else:
-        # Starting a new expedition — less valuable unless it's a contract
+        # Starting a new expedition — moderate value
         if card[1] == '0':
-            base_value = 2  # Contracts have conditional value
+            base_value = 3.0
         else:
-            base_value *= 0.5  # Discount uncommitted suits
+            base_value *= 0.7
 
-    # Multiplier bonus if we have contracts
-    n_contracts = sum(1 for c in played if c[1] == '0')
+    # Multiplier bonus if we have contracts in this suit
+    n_contracts = sum(1 for c in my_played if c[1] == '0')
     if n_contracts > 0 and card[1] != '0':
         base_value *= (1 + n_contracts * 0.3)
+
+    # Category 3 bonus: if opponent also wants it, extra value in denying them
+    if playable_for_opp and opp_played:
+        base_value += 1.0
 
     return base_value
 
 
 def expected_value_deck_draw(flags, hand, me):
-    """Expected value of drawing a random card from the deck.
-    Averages card_value_for_me over all unseen cards (approximation since
-    we can't distinguish deck from opponent's hand)."""
+    """Expected value of drawing from the deck.
+    Averages card_value_for_me over all unseen cards. Positive values mean
+    useful cards, negative means opponent-helpful cards, zero means neutral."""
     unseen = unseen_cards(flags, hand)
     if not unseen:
         return 0.0
