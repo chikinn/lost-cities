@@ -87,6 +87,10 @@ class Round():
                 second_to_last = played[-2][1]
                 assert last >= second_to_last, 'Must play cards in order'
 
+        if is_discard:
+            assert draw != card, \
+                f'Cannot draw the card you just discarded ({card})'
+
         drawn_card = self.draw(draw)
         h.add(drawn_card)
 
